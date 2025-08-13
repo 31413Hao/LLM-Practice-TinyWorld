@@ -13,9 +13,9 @@ def download_file(url: str, fname: str, chunk_size=1024):
     resp = requests.get(url, stream=True)
     
     # 获取文件的总大小（以字节为单位），默认为0如果没有提供'content-length'头信息
-    total = int(resp.headers.get("content-length", 0))
+    total = int(resp.headers.get("content-l ength", 0))
     
-    # 以写二进制模式打开一个文件以保存下载的内容
+    # 以写二进制模式根据fname打开一个文件以保存下载的内容
     with open(fname, "wb") as file, tqdm(
         desc=fname,           # 进度条前面的描述信息（通常是文件名）
         total=total,          # 总的字节数，用于设置进度条的总长度
@@ -65,7 +65,9 @@ def download():
     print(f"Number of shards: {len(shard_filenames)}")  # 打印解压后数据分片的数量
     print(f"Example story:\n{data[0]}")  # 打印第一个分片中的一个示例故事
 
+# 批量读取文本数据
 def load_text_from_files(path):
+    # 使用glob模块根据路径模式获取所有匹配的文件路径
     path_list = glob.glob(path)
     text_data = []
     for file_path in path_list:
@@ -73,10 +75,12 @@ def load_text_from_files(path):
             text_data.extend(file.readlines())
     return text_data
 
+# 批量读取文本数据
 def batch_iterator(text_data, batch_size=648):
     for i in range(0, len(text_data), batch_size):
         yield text_data[i:i + batch_size]
 
+# 训练词汇表
 def train_vocab(vocab_size: int=32000, num_shards: int=20):
     """
     vocab_size: int, 词汇表的大小，决定分词器的词汇量。
@@ -111,6 +115,14 @@ def train_vocab(vocab_size: int=32000, num_shards: int=20):
 
     # 2) 使用 SentencePiece 训练分词器
     print("Will now train the vocab...")
+    spm.SentencePieceTrainer.train(
+        input=tiny_file,
+        model_prefix=prefix,
+        model_type="bpe",
+        vocab_size=vocab_size,
+        self_test_sample_size=0,
+    )
+
     spm.SentencePieceTrainer.train(
         input=tiny_file,         # 输入文件为之前生成的 tiny.txt
         model_prefix=prefix,     # 模型前缀路径
