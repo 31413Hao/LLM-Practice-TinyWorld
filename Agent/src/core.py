@@ -36,33 +36,56 @@ class Agent:
 
         return {
             "role":"tool",
-            "conten": function_call_content,
+            "content": function_call_content,
             "tool_call_id": function_id,
         }
     
-    # 
-    def get_completion(self,prompt)->str:
+    # 位于 Agent/src/core.py
+
+    def get_completion(self, prompt: str) -> str:
+        # 1. 将用户的最新提问添加到对话历史中
         self.messages.append({"role": "user", "content": prompt})
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=self.messages,
-            tools=self.get_tool_schema(),
-            stream=False,
-        )
-        if response.choices[0].message.tool_calls:
-            self.messages.append({"role": "assistant", "content": response.choices[0].message.content})
-            tool_list = []
-            for tool_call in response.choices[0].message.tool_calls:
-                self.messages.append(self.handle_tool_call(tool_call))
-                tool_list.append([tool_call.function.name, tool_call.function.arguments])
-            if self.verbose:
-                print("调用工具:", response.choices[0].message.content,tool_list)
+        # 2. 进入一个循环，直到获得最终的文本回答
+        while True:
+            # 3. 发起 API 调用
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=self.messages,
                 tools=self.get_tool_schema(),
                 stream=False,
             )
-        self.messages.append({"role": "assistant", "content": response.choices[0].message.content})
-        return response.choices[0].message.content
+
+            response_message = response.choices[0].message
+
+            # 4. 检查模型是否请求调用工具
+            if response_message.tool_calls:
+                # a. 如果模型要调用工具，先将其“意图”存入历史
+                # 注意：这里的 content 可能是 None
+                self.messages.append(
+                    {"role": "assistant", "content": response_message.content}
+                )
+                
+                tool_list = []
+                # b. 遍历并执行所有工具调用
+                for tool_call in response_message.tool_calls:
+                    tool_list.append([tool_call.function.name, tool_call.function.arguments])
+                    # c. 执行工具并将其结果存入历史
+                    tool_response = self.handle_tool_call(tool_call)
+                    if "conten" in tool_response:
+                        tool_response["content"] = tool_response.pop("conten")
+                    self.messages.append(tool_response)
+                
+                if self.verbose:
+                    print("调用工具:", response_message.content, tool_list)
+                
+                # d. 继续下一次循环，将工具结果提交给模型
+                continue
+            else:
+                # e. 如果没有工具调用，说明模型已给出最终答案
+                # 将模型的最终回答添加到历史记录
+                self.messages.append(
+                    {"role": "assistant", "content": response_message.content}
+                )
+                # f. 返回最终回答并退出循环
+                return response_message.content
