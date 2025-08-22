@@ -2,6 +2,7 @@ import asyncio
 import json
 from contextlib import AsyncExitStack
 from typing import Any, Dict, List
+import os
 
 import nest_asyncio
 from dotenv import load_dotenv
@@ -19,7 +20,7 @@ load_dotenv("../.env")
 session = None
 exit_stack = AsyncExitStack()
 openai_client = AsyncOpenAI()
-model = "gpt-4o"
+model = os.getenv("llm_model")
 stdio = None
 write = None
 
